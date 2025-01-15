@@ -5,45 +5,34 @@ from sklearn import linear_model
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-# TODO: compare more models (quality to weight/size, etc.)
-# also maybe we should do one that's not multivariable?
-
 data = pd.read_csv("banana_quality.csv")
-data['Quality'].replace(['Good','Bad'], [1,0], inplace=True)
+data["Quality"].replace(["Good", "Bad"], [1, 0], inplace=True)
 
-x = data[["Weight", "Ripeness"]].values
-y = data["Quality"].values
+# Top 4 models based on R^2 (see daeval.py)
+models = [["Sweetness", "HarvestTime"], ["Size", "Sweetness"], ["Weight", "HarvestTime"], ["HarvestTime", "Ripeness"]]
 
-scaler = StandardScaler().fit(x)
-x = scaler.transform(x)
+for features in models:
+    x = data[features].values
+    y = data["Quality"].values
 
-x_train, x_test, y_train, y_test = train_test_split(x, y)
+    scaler = StandardScaler().fit(x)
+    x = scaler.transform(x)
 
-model = linear_model.LogisticRegression().fit(x_train, y_train)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
 
-rsq = model.score(x_test, y_test)
-print("Accuracy: " + str(rsq))
+    model = linear_model.LogisticRegression().fit(x_train, y_train)
+    print(f"Model: {features}, R^2 = {model.score(x_test, y_test):.2f}")
 
-# Plot 3D figure + best fit plane + display equation and R^2
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(data["Weight"], data["Ripeness"], data["Quality"], c=data["Quality"])
-ax.set_xlabel('Weight')
-ax.set_ylabel('Ripeness')
-ax.set_zlabel('Quality')
-
-xx, yy = np.meshgrid(np.linspace(data["Weight"].min(), data["Weight"].max(), 10),
-                     np.linspace(data["Ripeness"].min(), data["Ripeness"].max(), 10))
-zz = model.predict_proba(scaler.transform(np.c_[xx.ravel(), yy.ravel()]))[:, 1]
-zz = zz.reshape(xx.shape)
-
-ax.plot_surface(xx, yy, zz, color='blue', alpha=0.5)
-
-coef = model.coef_[0]
-intercept = model.intercept_[0]
-equation = f'Quality = {coef[0]:.2f} * Weight + {coef[1]:.2f} * Ripeness + {intercept:.2f}'
-ax.text2D(0.05, 0.95, equation, transform=ax.transAxes)
-ax.text2D(0.05, 0.90, f'R^2 = {rsq:.2f}', transform=ax.transAxes)
-
-plt.show()
+    good = data[data['Quality'] == 1]
+    bad = data[data['Quality'] == 0]
+    plt.scatter(good[features[1]], good[features[0]], color="g", label="Good")
+    plt.scatter(bad[features[1]], bad[features[0]], color="r", label="Bad")
+    plt.xlabel(features[1])
+    plt.ylabel(features[0])
+    plt.title(f"Banana Quality by {features[0]} and {features[1]}")
+    x_values = np.linspace(-2, 2, 100)
+    y_values = -(model.coef_[0][0] * x_values + model.intercept_) / model.coef_[0][1]
+    plt.plot(x_values, y_values, label="Regression Line")
+    plt.annotate(f"R^2 = {model.score(x_test, y_test):.2f}", xy=(0, 0), xytext=(0.01, 0.95), textcoords='axes fraction')
+    plt.legend()
+    plt.show()
